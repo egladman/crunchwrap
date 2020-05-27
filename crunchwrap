@@ -1,0 +1,261 @@
+#!/bin/bash -e
+
+# Copyright (c) 2020 Eli Gladman
+
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+
+# Crunchwrap
+# Barebones mustache-like templating written in pure Bash.
+
+# Install
+# cp crunchwrap /usr/local/bin/cw && chmod +x /usr/local/bin/cw
+
+# Report Issues
+# https://github.com/egladman/crunchwrap/issues
+
+# Introduction
+# Crunchwrap works by evaluating existing variables in your environment
+
+# Example
+# export FOO="give you up" BAR="let you down" BAZ="run around and desert you"
+# echo -e "Never gonna {{ FOO }}. Never gonna {{ BAR }}\nNever Gonna {{ BAZ }}" | cw
+
+readonly cw_pattern_left='{{ '
+readonly cw_pattern_right=' }}'
+
+readonly regex_crunchwrap_syntax='^(.*)(\{\{[[:space:]][a-zA-Z0-9_-]{0,}[[:space:]]\}\})(.*)$'
+readonly regex_character_class='^(\[\[\:)(crunchwrap_[a-zA-Z0-9_-]{0,})(\:\]\])$'
+
+# Non-standard Character Classes
+readonly cc_nospace='[[:crunchwrap_nospace:]]'
+readonly cc_space='[[:crunchwrap_space:]]'
+readonly cc_tab='[[:crunchwrap_tab:]]'
+# FIXME: We will run into an issue if read in a line that already contains the
+# above strings
+
+CLR_CYAN='\033[36m'
+CLR_NONE='\033[0m' # No color
+FL_DEBUG=0
+
+if [[ "${1}" = "-v" ]]; then
+    FL_DEBUG=1
+fi
+
+_log() {
+    printf '%b\n' "${0##*/}: ${@}" 1>&2
+}
+
+_debug() {
+    if [[ $FL_DEBUG -eq 1 ]]; then
+        _log "${CLR_CYAN}DEBUG:${CLR_NONE} ${*}"
+    fi
+}
+
+_strip_left() {
+    # Usage: _strip_left "string" "pattern"
+    printf '%s\n' "${1##$2}"
+}
+
+
+_strip_right() {
+    # Usage: _strip_right "string" "pattern"
+    printf '%s\n' "${1%%$2}"
+}
+
+_strip_all() {
+    # Usage: _strip_all "string" "pattern"
+    printf '%s\n' "${1//$2}"
+}
+
+_replace_all() {
+    # Usage: _replace_all "string" "pattern" "replace"
+    printf '%s\n' "${1//$2/$3}"
+}
+
+_strip_handlebars() {
+    # We can strip using pure bash by breaking it up into steps. Left then Right.
+    local string_raw="${1}"
+    local string=""
+
+    string_raw=$(_strip_left "${string_raw}" "*${cw_pattern_left}")
+    string=$(_strip_right "${string_raw}" "${cw_pattern_right}*")
+
+    printf '%s\n' "${string}"
+}
+
+_eval_handlebars() {
+    local string="${*}"
+
+    local cw_variable=$(_strip_handlebars "${string}")
+    local cw_value=$(eval printf '%s' \$${cw_variable})
+
+    _debug "var: cw_variable='${cw_variable}'"
+    _debug "var: cw_value='${cw_value}'"
+
+    # cw will more than happily pass in empty strings. Be sure that the
+    # equivalent environment variables are set. Why go through all the
+    # trouble? Sometimes we want an empty string
+
+    # Reconstruct pattern. I'm intentionally not using wildcards here. If
+    # their were multiple handlebar templates in a line we'd run into trouble
+    local pattern="${cw_pattern_left}${cw_variable}${cw_pattern_right}"
+    local replace="${cw_value}"
+
+    # Reprint the line/segment with the variable resolved
+    printf '%s\n' "${string/$pattern/$replace}"
+}
+
+# TODO: Refactor loop to reduce indentations
+_parse() {
+    local line="${1}"
+
+    # Before we do anything we need to replace all whitespace with specialty
+    # character classes that crunchwrap knows to look for
+    line=$(_replace_all "${line}" " " " ${cc_space} ") # spaces
+    line=$(_replace_all "${line}" $'\t' " ${cc_tab} ") # tabs
+
+    # Take the line that was piped in and split it into an array
+    # Why? there could be multiple template variables on one line
+    IFS=' ' read -r -a line_arr <<< "${line}"
+
+    local line_arr_transformed=()
+    local line_fragment_arr=()
+    local found_open_handlebars=0 found_handlebar_contents=0 found_closed_handlebars=0
+
+    local line_arr_splice_count=0
+
+    for ((i = 0; i < "${#line_arr[@]}"; i++)); do
+        # For reasons I haven't fully explored ((count++)) doesn't work, so I'm
+        # having to use the following to increment the counter by one
+
+        line_segment="${line_arr[$i]}"
+
+        regex_conjointed_handlebars="^(\}\})(.*)(\{\{)$"
+        if [[ "${line_segment}" =~ $regex_conjointed_handlebars ]]; then
+            # Check for consecutive crunchwrap variables that aren't delimited by a space:
+            # '{{ <string> }}<string>{{ <string> }}'
+            #              ^^^^^^^^^^^^
+            _debug "Found conjoined left/right patterns: '${line_segment}'. Splitting..."
+
+            local sandwiched_characters
+            sandwiched_characters=$(_strip_left "${line_segment}" "}}")
+            sandwiched_characters=$(_strip_right "${sandwiched_characters}" "{{")
+            # If var: sandwiched_characters is an empty string it won't be included into array: line_arr
+
+            local splice=("}}" "${cc_nospace}" "${sandwiched_characters}" "${cc_nospace}" "{{")
+            line_arr=("${line_arr[@]:0:$i}" "${splice[@]}" "${line_arr[@]:$((i+1))}")
+
+            line_arr_splice_count=$((line_arr_splice_count + 1))
+            _debug "var: line_arr_splice_count='${line_arr_splice_count}'"
+
+            # Since we've dynamically expanded thearray: line_arr we must
+            # manually update var: line_segment
+            line_segment="}}"
+        fi
+
+        # TODO: Make this it's own function
+        case "${line_segment}" in
+            *"${cw_pattern_left%%[[:space:]]}")
+                _debug "Found left pattern: ${line_segment}"
+                # We found the left: '{{ <string> }}'
+                #                     ^^
+                line_fragment_arr+=("${line_segment}")
+                found_open_handlebars=1
+                ;;
+            "${cw_pattern_right##[[:space:]]}"*)
+                _debug "Found right pattern: ${line_segment}"
+                # We found the right: '{{ <string> }}'
+                #                                  ^^
+                line_fragment_arr+=("${line_segment}")
+                found_closed_handlebars=1
+
+                # Check for mismatched/lone brackets
+                if [[ $found_open_handlebars -eq 0 && $found_closed_handlebars -eq 1 ]]; then
+                    _debug "Found unmatched handlebars. Ignoring '}}'"
+                    found_closed_handlebars=0
+                fi
+
+                # Found matching starting/ending handlebars
+                # We just flipped 'found_closed_handlebars' above, so their no point in checking it
+                if [[ $found_open_handlebars -eq 1 && $found_handlebar_contents -eq 1 ]]; then
+                    _debug "Calling func: _eval_handlebars with argument: ${line_fragment_arr[*]}"
+                    line_arr_transformed+=("$(_eval_handlebars "${line_fragment_arr[*]}")")
+
+                    # Reset. Just in case their are more crunchwrap variables in
+                    # the remainder of array: line_arr
+                    line_fragment_arr=() # Everything except the first element
+                    found_open_handlebars=0; found_handlebar_contents=0; found_closed_handlebars=0
+                fi
+                ;;
+            *)
+                if [[ $found_open_handlebars -eq 0  &&  $found_closed_handlebars -eq 0 ]]; then
+                    # We haven't found '{{' or '}}' so let's keep on going
+                    line_arr_transformed+=("${line_segment}")
+                elif [[ "${line_segment}" =~ $regex_character_class ]]; then
+                    _debug "Ignoring crunchwrap character class: ${line_segment}"
+                elif [[ $found_open_handlebars -eq 1 && $found_closed_handlebars -eq 0 ]]; then
+                    # We found the middle: '{{ <string> }}'
+                    #                          ^^^^^^^^
+                    line_fragment_arr+=("${line_segment}")
+                    found_handlebar_contents=1
+                fi
+                ;;
+        esac
+
+        if [[ $((i + 1)) -eq ${#line_arr[@]} ]]; then # We've reached the end of the line
+            # TODO: Make this it's own function
+            _debug "[EOF] var: index='$i' element='${line_arr[$i]}' line_arr_length='${#line_arr[@]}' line_arr_splice_count='${line_arr_splice_count}'"
+            _debug "[EOF] var: line_arr='${line_arr[*]}'"
+            _debug "[EOF] var: line_arr_transformed='${line_arr_transformed[*]}'"
+
+            local line_transformed=""
+            for ((j = 0; j < "${#line_arr_transformed[@]}"; j++)); do
+                chunk="${line_arr_transformed[$j]}"
+                case "${chunk}" in
+                    "${cc_nospace}")
+                        line_transformed+=''
+                        ;;
+                    "${cc_tab}")
+                        line_transformed+=$'\t'
+                        ;;
+                    "${cc_space}")
+                        line_transformed+=" "
+                        ;;
+                    *)
+                        line_transformed+="${chunk}"
+                        ;;
+                esac
+            done
+
+            # The finale
+            printf '%s\n' "${line_transformed}"
+        fi
+    done
+}
+
+# By default 'read' trims leading/trailing whitespace. so we must use override IFS
+while IFS='' read line; do
+    if [[ ! "${line}" =~ $regex_crunchwrap_syntax ]]; then
+        # Pass the unaltered string through if it doesn't contain: {{ <string> }}
+        _debug "Line doesn't match regex. Passing it through unmodified."
+        printf '%s\n' "${line}"
+        continue
+    fi
+    _parse "${line}"
+done
