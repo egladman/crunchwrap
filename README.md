@@ -55,7 +55,7 @@ hello {{ c }}\r?
 HELLO{{ e }}WORLD
 HELLO {{ e }} WORLD
 {{ d }}\t{{ c }}
-
+{{ g }}
 
 {{ f }}
 
@@ -63,7 +63,7 @@ EOF
 ```
 
 ```
-export a="Hello" b="H E L L O" c="world" d="hello" e=" & " f="HeLLo  WorLD"; cat /tmp/helloWorld.txt.cw | cw > /tmp/helloWorld.txt
+export a="Hello" b="H E L L O" c="world" d="hello" e=" & " f="HeLLo  WorLD" g="{{ d }}{{ c }}"; cat /tmp/helloWorld.txt.cw | cw > /tmp/helloWorld.txt
 ```
 
 
