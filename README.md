@@ -3,7 +3,7 @@ Barebones mustache-like templating written in pure Bash. Crunchwrap works by eva
 
 ### Dependencies
 
-- **Bash 4.0+** Unlike similar projects, crunchwrap doesn't depend on GNU Coreutils instead crunchwrap leverages Bash's builtins commands.
+- **Bash 4.0+** Unlike similar projects, crunchwrap doesn't depend on GNU Coreutils, instead crunchwrap leverages Bash's builtins commands.
 
 
 ### Syntax
@@ -73,9 +73,8 @@ export a="Hello" b="H E L L O" c="world" d="hello" e=" & " f="HeLLo  WorLD"; cat
 ```
 git clone https://github.com/egladman/crunchwrap.git
 cd crunchwrap
-cp cw.sh /usr/local/bin/cw
+cp crunchwrap /usr/local/bin/cw
 ```
-
 
 # Acknowledgements
 
