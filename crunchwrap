@@ -39,8 +39,8 @@
 readonly cw_pattern_left='{{ '
 readonly cw_pattern_right=' }}'
 
-readonly regex_crunchwrap_syntax='^(.*)(\{\{[[:space:]][a-zA-Z0-9_-]{0,}[[:space:]]\}\})(.*)$'
-readonly regex_character_class='^(\[\[\:)(crunchwrap_[a-zA-Z0-9_-]{0,})(\:\]\])$'
+readonly regex_crunchwrap_syntax='^(.*)(\{\{[[:space:]][a-zA-Z0-9_]{0,}[[:space:]]\}\})(.*)$'
+readonly regex_character_class='^(\[\[\:)(crunchwrap_[a-zA-Z0-9_]{0,})(\:\]\])$'
 
 # Non-standard Character Classes
 readonly cc_nospace='[[:crunchwrap_nospace:]]'
