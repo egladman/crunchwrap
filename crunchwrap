@@ -39,8 +39,8 @@
 readonly cw_pattern_left='{{ '
 readonly cw_pattern_right=' }}'
 
-readonly regex_crunchwrap_syntax='^(.*)(\{\{[[:space:]][a-zA-Z0-9_]{0,}[[:space:]]\}\})(.*)$'
-readonly regex_character_class='^(\[\[\:)(crunchwrap_[a-zA-Z0-9_]{0,})(\:\]\])$'
+readonly regex_crunchwrap_syntax='^(.*)(\{\{[[:space:]][a-zA-Z0-9_]{1,}[[:space:]]\}\})(.*)$'
+readonly regex_character_class='^(\[\[\:)(crunchwrap_[a-zA-Z0-9_]{1,})(\:\]\])$'
 
 # Non-standard Character Classes
 readonly cc_nospace='[[:crunchwrap_nospace:]]'
@@ -103,10 +103,21 @@ _eval_handlebars() {
     local string="${*}"
 
     local cw_variable=$(_strip_handlebars "${string}")
-    local cw_value=$(eval printf '%s' \$${cw_variable})
+    local cw_value=$(eval printf '%s' \"\$${cw_variable}\")
 
     _debug "var: cw_variable='${cw_variable}'"
     _debug "var: cw_value='${cw_value}'"
+
+    # TODO: refactor. this is super redudant
+    # Check for nested crunchwrap variables
+    if [[ "${cw_value}" =~ $regex_crunchwrap_syntax ]]; then
+	      _debug "Found additional handlebars while evaluating: ${cw_variable}"
+	      local cw_value_old="${cw_value}"
+	      cw_value=''
+	      while IFS='' read -r line; do
+	          cw_value+="$(_parse "${line}")"
+	      done <<< "${cw_value_old}"
+    fi
 
     # cw will more than happily pass in empty strings. Be sure that the
     # equivalent environment variables are set. Why go through all the
