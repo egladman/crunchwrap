@@ -104,7 +104,7 @@ _eval_handlebars() {
 
     local cw_variable cw_value
     cw_variable=$(_strip_handlebars "${string}")
-    cw_value=$(eval printf '%s' \"\$${cw_variable}\")
+    cw_value=$(eval printf '%s' \"\$"${cw_variable}"\")
 
     _debug "var: cw_variable='${cw_variable}'"
     _debug "var: cw_value='${cw_value}'"
