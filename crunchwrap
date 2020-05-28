@@ -58,7 +58,7 @@ if [[ "${1}" = "-v" ]]; then
 fi
 
 _log() {
-    printf '%b\n' "${0##*/}: ${@}" 1>&2
+    printf '%b\n' "${0##*/}: ${*}" 1>&2
 }
 
 _debug() {
@@ -102,8 +102,9 @@ _strip_handlebars() {
 _eval_handlebars() {
     local string="${*}"
 
-    local cw_variable=$(_strip_handlebars "${string}")
-    local cw_value=$(eval printf '%s' \"\$${cw_variable}\")
+    local cw_variable cw_value
+    cw_variable=$(_strip_handlebars "${string}")
+    cw_value=$(eval printf '%s' \"\$${cw_variable}\")
 
     _debug "var: cw_variable='${cw_variable}'"
     _debug "var: cw_value='${cw_value}'"
@@ -261,7 +262,7 @@ _parse() {
 }
 
 # By default 'read' trims leading/trailing whitespace. so we must use override IFS
-while IFS='' read line; do
+while IFS='' read -r line; do
     if [[ ! "${line}" =~ $regex_crunchwrap_syntax ]]; then
         # Pass the unaltered string through if it doesn't contain: {{ <string> }}
         _debug "Line doesn't match regex. Passing it through unmodified."
