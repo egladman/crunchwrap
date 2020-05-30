@@ -72,7 +72,6 @@ _strip_left() {
     printf '%s\n' "${1##$2}"
 }
 
-
 _strip_right() {
     # Usage: _strip_right "string" "pattern"
     printf '%s\n' "${1%%$2}"
@@ -112,12 +111,12 @@ _eval_handlebars() {
     # TODO: refactor. this is super redudant
     # Check for nested crunchwrap variables
     if [[ "${cw_value}" =~ $regex_crunchwrap_syntax ]]; then
-	      _debug "Found additional handlebars while evaluating: ${cw_variable}"
-	      local cw_value_old="${cw_value}"
-	      cw_value=''
-	      while IFS='' read -r line; do
-	          cw_value+="$(_parse "${line}")"
-	      done <<< "${cw_value_old}"
+        _debug "Found additional handlebars while evaluating: ${cw_variable}"
+        local cw_value_old="${cw_value}"
+        cw_value=''
+        while IFS='' read -r line; do
+            cw_value+="$(_parse "${line}")"
+        done <<< "${cw_value_old}"
     fi
 
     # cw will more than happily pass in empty strings. Be sure that the
