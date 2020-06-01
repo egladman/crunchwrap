@@ -98,7 +98,7 @@ _strip_handlebars() {
     printf '%s\n' "${string}"
 }
 
-_strip_classes() {
+_strip_character_classes() {
     local array=("${@}")
     local string=""
 
@@ -259,7 +259,7 @@ _parse() {
             _debug "[EOL] var: line_arr_transformed='${line_arr_transformed[*]}'"
 
             # The finale. What gets printed to stdout
-            _strip_classes "${line_arr_transformed[@]}"
+            _strip_character_classes "${line_arr_transformed[@]}"
         fi
     done
 }
