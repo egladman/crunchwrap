@@ -15,8 +15,16 @@ Barebones mustache-like templating written in pure Bash. Crunchwrap works by eva
 ### Examples
 
 ```
-export foo="Never gonna" bar="give you up" baz="let you down" qux="run around and desert you"
+export bar="give you up" qux="run around and desert you" baz="let you down" foo="Never gonna"
 echo -e "{{ foo }} {{ bar }}\n{{ foo }} {{ baz }}\n{{ foo }} {{ qux }}" | cw 
+```
+
+#### Results
+
+```
+Never gonna give you up
+Never gonna let you down
+Never gonna run around and desert you
 ```
 
 --- 
@@ -37,6 +45,19 @@ EOF
 
 ```
 export foo="Hello World"; cat /tmp/sample.html.cw | cw > /tmp/sample.html
+```
+
+#### Results
+
+```
+<!DOCTYPE html>
+<html>
+<body>
+
+<h1>Hello World</h1>
+
+</body>
+</html>
 ```
 
 ---
@@ -66,14 +87,32 @@ EOF
 export a="Hello" b="H E L L O" c="world" d="hello" e=" & " f="HeLLo  WorLD" g="{{ d }}{{ c }}"; cat /tmp/helloWorld.txt.cw | cw > /tmp/helloWorld.txt
 ```
 
+#### Results
 
+```
+
+HelloWorld
+
+hello world
+hello world\r?
+ hello world!
+H E L L O    W O R L D
+hello_world
+  helloworld
+HELLO & WORLD
+HELLO  &  WORLD
+hello\tworld
+helloworld
+
+HeLLo  WorLD
+
+```
 
 ### Install
 
 ```
 git clone https://github.com/egladman/crunchwrap.git
-cd crunchwrap
-cp crunchwrap /usr/local/bin/cw
+cp crunchwrap/crunchwrap /usr/local/bin/cw
 ```
 
 # Acknowledgements

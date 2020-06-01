@@ -72,7 +72,6 @@ _strip_left() {
     printf '%s\n' "${1##$2}"
 }
 
-
 _strip_right() {
     # Usage: _strip_right "string" "pattern"
     printf '%s\n' "${1%%$2}"
@@ -99,6 +98,30 @@ _strip_handlebars() {
     printf '%s\n' "${string}"
 }
 
+_strip_character_classes() {
+    local array=("${@}")
+    local string=""
+
+    for ((j = 0; j < "${#array[@]}"; j++)); do
+        chunk="${array[$j]}"
+        case "${chunk}" in
+            "${cc_nospace}")
+                string+=''
+                ;;
+            "${cc_tab}")
+                string+=$'\t'
+                ;;
+            "${cc_space}")
+                string+=" "
+                ;;
+            *)
+                string+="${chunk}"
+                ;;
+        esac
+    done
+    printf '%s\n' "${string}"
+}
+
 _eval_handlebars() {
     local string="${*}"
 
@@ -112,12 +135,12 @@ _eval_handlebars() {
     # TODO: refactor. this is super redudant
     # Check for nested crunchwrap variables
     if [[ "${cw_value}" =~ $regex_crunchwrap_syntax ]]; then
-	      _debug "Found additional handlebars while evaluating: ${cw_variable}"
-	      local cw_value_old="${cw_value}"
-	      cw_value=''
-	      while IFS='' read -r line; do
-	          cw_value+="$(_parse "${line}")"
-	      done <<< "${cw_value_old}"
+        _debug "Found additional handlebars while evaluating: ${cw_variable}"
+        local cw_value_old="${cw_value}"
+        cw_value=''
+        while IFS='' read -r line; do
+            cw_value+="$(_parse "${line}")"
+        done <<< "${cw_value_old}"
     fi
 
     # cw will more than happily pass in empty strings. Be sure that the
@@ -133,7 +156,6 @@ _eval_handlebars() {
     printf '%s\n' "${string/$pattern/$replace}"
 }
 
-# TODO: Refactor loop to reduce indentations
 _parse() {
     local line="${1}"
 
@@ -181,7 +203,7 @@ _parse() {
             line_segment="}}"
         fi
 
-        # TODO: Make this it's own function
+        # Classify line segment.
         case "${line_segment}" in
             *"${cw_pattern_left%%[[:space:]]}")
                 _debug "Found left pattern: ${line_segment}"
@@ -231,32 +253,12 @@ _parse() {
         esac
 
         if [[ $((i + 1)) -eq ${#line_arr[@]} ]]; then # We've reached the end of the line
-            # TODO: Make this it's own function
-            _debug "[EOF] var: index='$i' element='${line_arr[$i]}' line_arr_length='${#line_arr[@]}' line_arr_splice_count='${line_arr_splice_count}'"
-            _debug "[EOF] var: line_arr='${line_arr[*]}'"
-            _debug "[EOF] var: line_arr_transformed='${line_arr_transformed[*]}'"
+            _debug "[EOL] var: index='$i' element='${line_arr[$i]}' line_arr_length='${#line_arr[@]}' line_arr_splice_count='${line_arr_splice_count}'"
+            _debug "[EOL] var: line_arr='${line_arr[*]}'"
+            _debug "[EOL] var: line_arr_transformed='${line_arr_transformed[*]}'"
 
-            local line_transformed=""
-            for ((j = 0; j < "${#line_arr_transformed[@]}"; j++)); do
-                chunk="${line_arr_transformed[$j]}"
-                case "${chunk}" in
-                    "${cc_nospace}")
-                        line_transformed+=''
-                        ;;
-                    "${cc_tab}")
-                        line_transformed+=$'\t'
-                        ;;
-                    "${cc_space}")
-                        line_transformed+=" "
-                        ;;
-                    *)
-                        line_transformed+="${chunk}"
-                        ;;
-                esac
-            done
-
-            # The finale
-            printf '%s\n' "${line_transformed}"
+            # The finale. What gets printed to stdout
+            _strip_character_classes "${line_arr_transformed[@]}"
         fi
     done
 }
