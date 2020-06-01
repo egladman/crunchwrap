@@ -156,7 +156,6 @@ _eval_handlebars() {
     printf '%s\n' "${string/$pattern/$replace}"
 }
 
-# TODO: Refactor loop to reduce indentations
 _parse() {
     local line="${1}"
 
@@ -204,7 +203,7 @@ _parse() {
             line_segment="}}"
         fi
 
-        # TODO: Make this it's own function
+        # Classify line segment.
         case "${line_segment}" in
             *"${cw_pattern_left%%[[:space:]]}")
                 _debug "Found left pattern: ${line_segment}"
