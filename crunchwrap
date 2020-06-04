@@ -36,11 +36,16 @@
 # export FOO="give you up" BAR="let you down" BAZ="run around and desert you"
 # echo -e "Never gonna {{ FOO }}. Never gonna {{ BAR }}\nNever Gonna {{ BAZ }}" | cw
 
-readonly cw_pattern_left='{{ '
-readonly cw_pattern_right=' }}'
+readonly cw_pattern_left='{{'
+readonly cw_pattern_right='}}'
+readonly cw_pattern_left_strict='{{!'
+readonly cw_pattern_left_escaped='{{%'
 
-readonly regex_crunchwrap_syntax='^(.*)(\{\{[[:space:]][a-zA-Z0-9_]{1,}[[:space:]]\}\})(.*)$'
+# BRE Regex
+readonly regex_crunchwrap_syntax='^(.*)(\{\{[\%|\!]{0,1}[[:space:]][a-zA-Z0-9_]{1,}[[:space:]]\}\})(.*)$'
 readonly regex_character_class='^(\[\[\:)(crunchwrap_[a-zA-Z0-9_]{1,})(\:\]\])$'
+readonly regex_crunchwrap_strict_syntax='^(.*)(\{\{\![[:space:]][a-zA-Z0-9_]{1,}[[:space:]]\}\})(.*)$'
+readonly regex_crunchwrap_escaped_syntax='^(.*)(\{\{\%[[:space:]][a-zA-Z0-9_]{1,}[[:space:]]\}\})(.*)$'
 
 # Non-standard Character Classes
 readonly cc_nospace='[[:crunchwrap_nospace:]]'
@@ -50,6 +55,7 @@ readonly cc_tab='[[:crunchwrap_tab:]]'
 # above strings
 
 CLR_CYAN='\033[36m'
+CLR_RED='\033[0;31m'
 CLR_NONE='\033[0m' # No color
 FL_DEBUG=0
 
@@ -58,13 +64,23 @@ if [[ "${1}" = "-v" ]]; then
 fi
 
 _log() {
-    printf '%b\n' "${0##*/}: ${*}" 1>&2
+    printf '%b\n' "${0##*/}: ${1}" 1>&2
 }
 
 _debug() {
     if [[ $FL_DEBUG -eq 1 ]]; then
-        _log "${CLR_CYAN}DEBUG:${CLR_NONE} ${*}"
+        _log "${CLR_CYAN}DEBUG:${CLR_NONE} ${1}"
     fi
+}
+
+_die() {
+    # Usage: _die "goodbye cruel world" 128
+    _log "${CLR_RED}FATAL:${CLR_NONE} ${1}"
+
+    local rc
+    # Default to return code: '1' if nothing is specified
+    [[ -z "${2}" ]] && rc=1
+    exit $rc
 }
 
 _strip_left() {
@@ -87,13 +103,28 @@ _replace_all() {
     printf '%s\n' "${1//$2/$3}"
 }
 
+_replace_first() {
+    # Usage: _replace_first "string" "pattern" "replace"
+    printf '%s\n' "${1/$2/$3}"
+}
+
+_escape_html () {
+    # Usage: _esacpe_html "hello & goodbye"
+    local string
+    string=${1//&/&amp;}
+    string=${string//</&lt;}
+    string=${string//>/&gt;}
+    string=${string//'"'/&quot;}
+    printf '%s' "$string"
+}
+
 _strip_handlebars() {
     # We can strip using pure bash by breaking it up into steps. Left then Right.
     local string_raw="${1}"
     local string=""
 
-    string_raw=$(_strip_left "${string_raw}" "*${cw_pattern_left}")
-    string=$(_strip_right "${string_raw}" "${cw_pattern_right}*")
+    string_raw=$(_strip_left "${string_raw}" "*${cw_pattern_left} ")
+    string=$(_strip_right "${string_raw}" " ${cw_pattern_right}*")
 
     printf '%s\n' "${string}"
 }
@@ -124,15 +155,72 @@ _strip_character_classes() {
 
 _eval_handlebars() {
     local string="${*}"
-
     local cw_variable cw_value
+
+    if [[ "${string}" =~ $regex_crunchwrap_strict_syntax ]]; then
+        # This can equal essentially anything. It's set to 'true' for easy
+        # readability, further down all we're doing is making sure the variable
+        # is set. The actual contents of the variable doesn't matter. See `-v`
+        # in man bash.
+        fail_when_empty=true
+        _debug "var: fail_when_empty='${fail_when_empty}'"
+
+        # Replace '{{!' with '{{'
+
+        # I have to be clever with how i replace '{{!' with '{{'. I must be
+        # careful how I perform a find/replace. As there's a super small
+        # chance '{{!' is printed twice. I can make the following assumptions:
+        # - There will not be any spaces left of '{{%'
+        # - There will be a space to the right of '{{%'
+
+        # Given this information I can perform a find/replace on '{{! '. The
+        # added space is critical!
+
+        string=$(_replace_first "${string}" "${cw_pattern_left_strict} " "{{ ")
+    fi
+
+    if [[ "${string}" =~ $regex_crunchwrap_escaped_syntax ]]; then
+        # This can equal essentially anything. It's set to 'true' for easy
+        # readability, further down all we're doing is making sure the variable
+        # is set. The actual contents of the variable doesn't matter. See `-v`
+        # in man bash.
+        escape_html=true
+        _debug "var: escape_html='${escape_html}'"
+
+        # Replace '{{%' with '{{'
+
+        # I have to be clever with how i replace '{{%' with '{{'. I must be
+        # careful how I perform a find/replace. As there's a super small
+        # chance '{{!' is printed twice. I can make the following assumptions:
+        # - There will not be any spaces left of '{{%'
+        # - There will be a space to the right of '{{%'
+
+        # Given this information I can perform a find/replace on '{{% '. The
+        # added space is critical!
+
+        string=$(_replace_first "${string}" "${cw_pattern_left_escaped} " "{{ ")
+    fi
+
     cw_variable=$(_strip_handlebars "${string}")
     cw_value=$(eval printf '%s' \"\$"${cw_variable}"\")
+
+    if [[ -v fail_when_empty ]] && [[ -z "${cw_value}" ]]; then
+         _log "environment variable: '${cw_variable}' evaluated to an empty string. Dying. Use '{{ <string> }}' instead of '{{! <string>}}' if this behavior is not desired."
+         return 126
+    fi
+    unset fail_when_empty
+
+    if [[ -v escape_html ]] && [[ -n "${cw_value}" ]]; then
+        _debug "Calling func: '_escape_html' with argument: ${cw_value}"
+        cw_value=$(_escape_html "${cw_value}")
+
+        _debug "var: cw_value='${cw_value}'"
+    fi
+    unset escape_html
 
     _debug "var: cw_variable='${cw_variable}'"
     _debug "var: cw_value='${cw_value}'"
 
-    # TODO: refactor. this is super redudant
     # Check for nested crunchwrap variables
     if [[ "${cw_value}" =~ $regex_crunchwrap_syntax ]]; then
         _debug "Found additional handlebars while evaluating: ${cw_variable}"
@@ -149,7 +237,7 @@ _eval_handlebars() {
 
     # Reconstruct pattern. I'm intentionally not using wildcards here. If
     # their were multiple handlebar templates in a line we'd run into trouble
-    local pattern="${cw_pattern_left}${cw_variable}${cw_pattern_right}"
+    local pattern="${cw_pattern_left} ${cw_variable} ${cw_pattern_right}"
     local replace="${cw_value}"
 
     # Reprint the line/segment with the variable resolved
@@ -171,13 +259,15 @@ _parse() {
     local line_arr_transformed=()
     local line_fragment_arr=()
     local found_open_handlebars=0 found_handlebar_contents=0 found_closed_handlebars=0
-
     local line_arr_splice_count=0
 
     for ((i = 0; i < "${#line_arr[@]}"; i++)); do
-        # For reasons I haven't fully explored ((count++)) doesn't work, so I'm
-        # having to use the following to increment the counter by one
+        # This might seem counter-intuitive. Here's why don't do:
+        # > for line_segment in "${line_arr[@]}"
 
+        # We dynamically add elements to array: 'line_arr'. The loop wouldn't
+        # know to look for new elements inserted into the array since the length
+        # of '${line_arr[@]}' gets cached at the beginning.
         line_segment="${line_arr[$i]}"
 
         regex_conjointed_handlebars="^(\}\})(.*)(\{\{)$"
@@ -200,20 +290,21 @@ _parse() {
 
             # Since we've dynamically expanded thearray: line_arr we must
             # manually update var: line_segment
-            line_segment="}}"
+            line_segment="${cw_pattern_right}"
         fi
 
-        # Classify line segment.
+        # Classify line segment. Does it have any special meaning to crunchwrap
+        # or does the segment consist of random characters?
         case "${line_segment}" in
-            *"${cw_pattern_left%%[[:space:]]}")
-                _debug "Found left pattern: ${line_segment}"
+            *"${cw_pattern_left}"|*"${cw_pattern_left_strict}"|*"${cw_pattern_left_escaped}")
+                _debug "Found left pattern: '${line_segment}'"
                 # We found the left: '{{ <string> }}'
                 #                     ^^
                 line_fragment_arr+=("${line_segment}")
                 found_open_handlebars=1
                 ;;
-            "${cw_pattern_right##[[:space:]]}"*)
-                _debug "Found right pattern: ${line_segment}"
+            "${cw_pattern_right}"*)
+                _debug "Found right pattern: '${line_segment}'"
                 # We found the right: '{{ <string> }}'
                 #                                  ^^
                 line_fragment_arr+=("${line_segment}")
@@ -229,7 +320,12 @@ _parse() {
                 # We just flipped 'found_closed_handlebars' above, so their no point in checking it
                 if [[ $found_open_handlebars -eq 1 && $found_handlebar_contents -eq 1 ]]; then
                     _debug "Calling func: _eval_handlebars with argument: ${line_fragment_arr[*]}"
-                    line_arr_transformed+=("$(_eval_handlebars "${line_fragment_arr[*]}")")
+
+                    local results results_rc
+                    results=$(_eval_handlebars "${line_fragment_arr[*]}")
+                    [[ $? -eq 0 ]] || return
+
+                    line_arr_transformed+=("${results}")
 
                     # Reset. Just in case their are more crunchwrap variables in
                     # the remainder of array: line_arr
@@ -242,8 +338,9 @@ _parse() {
                     # We haven't found '{{' or '}}' so let's keep on going
                     line_arr_transformed+=("${line_segment}")
                 elif [[ "${line_segment}" =~ $regex_character_class ]]; then
-                    _debug "Ignoring crunchwrap character class: ${line_segment}"
+                    _debug "Ignoring crunchwrap character class: '${line_segment}'"
                 elif [[ $found_open_handlebars -eq 1 && $found_closed_handlebars -eq 0 ]]; then
+                    _debug "Found middle: '${line_segment}'"
                     # We found the middle: '{{ <string> }}'
                     #                          ^^^^^^^^
                     line_fragment_arr+=("${line_segment}")
@@ -271,5 +368,7 @@ while IFS='' read -r line; do
         printf '%s\n' "${line}"
         continue
     fi
-    _parse "${line}"
+
+    # The 'break' is kinda redudant since errexit is enabled
+    _parse "${line}" || break
 done

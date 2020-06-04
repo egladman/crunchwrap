@@ -12,6 +12,23 @@ Barebones mustache-like templating written in pure Bash. Crunchwrap works by eva
 {{ <var> }}
 ```
 
+---
+
+Exit if `<var>` evaluates to an empty string
+
+```
+{{! <var> }}
+```
+
+---
+
+Escape html
+
+```
+{{% <var> }}
+```
+*Note:* This is super useful if you use crunchwrap as a static site generator. See [egladman/egladman.github.io](https://github.com/egladman/egladman.github.io) for an example.
+
 ### Examples
 
 ```
@@ -78,13 +95,13 @@ HELLO {{ e }} WORLD
 {{ d }}\t{{ c }}
 {{ g }}
 
-{{ f }}
+{{% f }}
 
 EOF
 ```
 
 ```
-export a="Hello" b="H E L L O" c="world" d="hello" e=" & " f="HeLLo  WorLD" g="{{ d }}{{ c }}"; cat /tmp/helloWorld.txt.cw | cw > /tmp/helloWorld.txt
+export a="Hello" b="H E L L O" c="world" d="hello" e=" & " f="\"HeLLo\" & GoODbyE" g="{{ d }}{{ c }}"; cat /tmp/helloWorld.txt.cw | cw > /tmp/helloWorld.txt
 ```
 
 #### Results
@@ -104,7 +121,8 @@ HELLO  &  WORLD
 hello\tworld
 helloworld
 
-HeLLo  WorLD
+&quot;HeLLo&quot; &amp; GoODbyE
+
 
 ```
 
