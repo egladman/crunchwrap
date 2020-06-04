@@ -321,7 +321,7 @@ _parse() {
                 if [[ $found_open_handlebars -eq 1 && $found_handlebar_contents -eq 1 ]]; then
                     _debug "Calling func: _eval_handlebars with argument: ${line_fragment_arr[*]}"
 
-                    local results results_rc
+                    local results
                     results=$(_eval_handlebars "${line_fragment_arr[*]}")
                     [[ $? -eq 0 ]] || return
 
