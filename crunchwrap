@@ -40,12 +40,14 @@ readonly cw_pattern_left='{{'
 readonly cw_pattern_right='}}'
 readonly cw_pattern_left_strict='{{!'
 readonly cw_pattern_left_escaped='{{%'
+readonly cw_pattern_left_import='{{@'
 
 # BRE Regex
-readonly regex_crunchwrap_syntax='^(.*)(\{\{[\%|\!]{0,1}[[:space:]][a-zA-Z0-9_]{1,}[[:space:]]\}\})(.*)$'
+readonly regex_crunchwrap_syntax='^(.*)(\{\{[\%|\!\@]{0,1}[[:space:]][a-zA-Z0-9_/.-]{1,}[[:space:]]\}\})(.*)$'
 readonly regex_character_class='^(\[\[\:)(crunchwrap_[a-zA-Z0-9_]{1,})(\:\]\])$'
 readonly regex_crunchwrap_strict_syntax='^(.*)(\{\{\![[:space:]][a-zA-Z0-9_]{1,}[[:space:]]\}\})(.*)$'
 readonly regex_crunchwrap_escaped_syntax='^(.*)(\{\{\%[[:space:]][a-zA-Z0-9_]{1,}[[:space:]]\}\})(.*)$'
+readonly regex_crunchwrap_import_syntax='^(.*)(\{\{\@[[:space:]][a-zA-Z0-9_/.-]{1,}[[:space:]]\}\})(.*)$'
 
 # Non-standard Character Classes
 readonly cc_nospace='[[:crunchwrap_nospace:]]'
@@ -162,6 +164,8 @@ _eval_tags() {
     local string="${*}"
     local cw_variable cw_value
 
+    _debug "func: '${FUNCNAME[0]}' called with argument: '${*}'"
+
     # Replace '{{<d>' with '{{'                             (d for delimiter)
     # -----------------------------------------------------------------------
     # We must be clever with how we replace '{{%' with '{{'. If we perform
@@ -193,19 +197,33 @@ _eval_tags() {
         _debug "var: escape_html='${escape_html}' for string: '${string}'"
 
         string=$(_replace_first "${string}" "${cw_pattern_left_escaped} " "{{ ")
+    elif [[ "${string}" =~ $regex_crunchwrap_import_syntax ]]; then
+        import_template=true
+        _debug "var: import_template='${import_tempate}' for string: '${string}'"
+
+        string=$(_replace_first "${string}" "${cw_pattern_left_import} " "{{ ")
     fi
 
     cw_variable=$(_strip_handlebars "${string}")
-    cw_value=$(eval printf '%s' \"\$"${cw_variable}"\")
+
+    if [[ -v import_template ]] && [[ -n "${cw_variable}" ]]; then
+        unset import_template
+
+        [[ ! -f "${cw_variable}" ]] && _die "Template: '${cw_variable}' does not exist."
+
+        # Alternative way to print file contents. Many would just 'cat' the file
+        cw_value=$(printf '%s\n' "$(<$cw_variable)" | main)
+    else
+        cw_value=$(eval printf '%s' \"\$"${cw_variable}"\")
+    fi
 
     if [[ -v fail_when_empty ]] && [[ -z "${cw_value}" ]]; then
         unset fail_when_empty
-        _log "environment variable: '${cw_variable}' evaluated to an empty string. Dying. Use '{{ <string> }}' instead of '{{! <string>}}' if this behavior is not desired."
-        return 126
-    fi
 
-    if [[ -v escape_html ]] && [[ -n "${cw_value}" ]]; then
+        _die "Variable: '${cw_variable}' evaluated to an empty string." 126
+    elif [[ -v escape_html ]] && [[ -n "${cw_value}" ]]; then
         unset escape_html
+
         _debug "Calling func: '_escape_html' with argument: ${cw_value}"
         cw_value=$(_escape_html "${cw_value}")
 
@@ -235,6 +253,8 @@ _eval_tags() {
 
 _parse() {
     local line="${1}"
+
+    _debug "func: '${FUNCNAME[0]}' called with argument: '$1'"
 
     # Before we do anything we need to replace all whitespace with specialty
     # character classes that crunchwrap knows to look for
@@ -269,7 +289,8 @@ _parse() {
             local sandwiched_characters
             sandwiched_characters=$(_strip_left "${line_segment}" "}}")
             sandwiched_characters=$(_strip_right "${sandwiched_characters}" "{{")
-            # If var: sandwiched_characters is an empty string it won't be included into array: line_arr
+            # If var: sandwiched_characters is an empty string it won't be
+            # included into array: line_arr
 
             local splice=("}}" "${cc_nospace}" "${sandwiched_characters}" "${cc_nospace}" "{{")
             line_arr=("${line_arr[@]:0:$i}" "${splice[@]}" "${line_arr[@]:$((i+1))}")
@@ -285,7 +306,7 @@ _parse() {
         # Classify line segment. Does it have any special meaning to crunchwrap
         # or does the segment consist of random characters?
         case "${line_segment}" in
-            *"${cw_pattern_left}"|*"${cw_pattern_left_strict}"|*"${cw_pattern_left_escaped}")
+            *"${cw_pattern_left}"|*"${cw_pattern_left_strict}"|*"${cw_pattern_left_escaped}"|*"${cw_pattern_left_import}")
                 _debug "Found left pattern: '${line_segment}'"
                 # We found the left: '{{ <string> }}'
                 #                     ^^
@@ -308,8 +329,6 @@ _parse() {
                 # Found matching starting/ending handlebars
                 # We just flipped 'found_closed_tag' above, so their no point in checking it
                 if [[ $found_open_tag -eq 1 && $found_tag_contents -eq 1 ]]; then
-                    _debug "Calling func: _eval_tags with argument: ${line_fragment_arr[*]}"
-
                     local results
                     results=$(_eval_tags "${line_fragment_arr[*]}")
                     [[ $? -eq 0 ]] || return
@@ -351,10 +370,14 @@ _parse() {
 
 main() {
     # By default 'read' trims leading/trailing whitespace. so we must use override IFS
-    while IFS='' read -r line; do
+    while IFS='' read -r line || [[ -n "${line}" ]]; do
+        # || [[ -n "${line}" ]]
+        # Without this 'or' conditional single line inputs that don't end with
+        # a newline won't be picked up
+
         if [[ ! "${line}" =~ $regex_crunchwrap_syntax ]]; then
             # Pass the unaltered string through if it doesn't contain: {{ <string> }}
-            _debug "Line doesn't match regex. Passing it through unmodified."
+            _debug "Line: '${line}' doesn't match regex. Passing it through unmodified."
             printf '%s\n' "${line}"
             continue
         fi
