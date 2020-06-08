@@ -366,8 +366,8 @@ _parse() {
             chunk="${cw_pattern_right}"
         fi
 
-        # Classify line segment. Does it have any special meaning to crunchwrap
-        # or does the segment consist of random characters?
+        # Classify chunk. Does it have any special meaning to crunchwrap
+        # or does the chunk consist of random characters?
         case "${chunk}" in
             *"${cw_pattern_left}"|*"${cw_pattern_left_strict}"|*"${cw_pattern_left_escaped}"|*"${cw_pattern_left_import}")
                 _debug "Found left pattern: '${chunk}'"
@@ -398,7 +398,7 @@ _parse() {
 
                     line_arr_transformed+=("${results}")
 
-                    # Reset. Just in case their are more crunchwrap variables in
+                    # Reset. Just in case their are more crunchwrap tags in
                     # the remainder of array: line_arr
                     _flush line_fragment_arr found_open_tag found_tag_contents found_closed_tag
                 fi
