@@ -404,7 +404,7 @@ _parse() {
                 fi
                 ;;
             *)
-                if [[ $found_open_tag -eq 0  &&  $found_closed_tag -eq 0 ]]; then
+                if [[ $found_open_tag -eq 0 ]] && [[ $found_closed_tag -eq 0 ]]; then
                     # We haven't found '{{' or '}}' so let's keep on going
                     line_arr_transformed+=("${chunk}")
                 elif [[ "${chunk}" =~ $regex_character_class ]]; then
