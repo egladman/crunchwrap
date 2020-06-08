@@ -32,6 +32,7 @@
 # Example
 # export FOO="give you up" BAR="let you down" BAZ="run around and desert you"
 # echo -e "Never gonna {{ FOO }}. Never gonna {{ BAR }}\nNever Gonna {{ BAZ }}" | cw
+
 readonly cw_version="0.1.0"
 
 readonly cw_pattern_left='{{'
@@ -178,7 +179,7 @@ _flush() {
 
 _strip_brackets() {
     # Usage: _strip_brackets "{{ foo }}"
-    
+
     # We can strip using pure bash by breaking it up into steps. Left then Right.
     local string_raw="${1}"
     local string=""
@@ -512,7 +513,7 @@ main() {
 
     # Check to make sure we have at least one element in array: 'source_arr'
     if [[ -z "${source_files_arr[0]}" ]] && [[ $fl_ignore_environment -eq 1 ]]; then
-        _die "Option 'ignore environment' requires file paths. None given."
+        _die "Option 'ignore environment' requires file path(s). None given."
 
     fi
 
