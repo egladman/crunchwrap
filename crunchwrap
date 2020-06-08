@@ -21,19 +21,12 @@
 # SOFTWARE.
 
 # Crunchwrap
-# Barebones mustache-like templating written in pure Bash.
+# A logic-less templating engine inspired by mustache. Written in pure bash.
 
 # Install
 # cp crunchwrap /usr/local/bin/cw && chmod +x /usr/local/bin/cw
 
-# Introduction
-# Crunchwrap works by evaluating existing variables in your environment
-
-# Example
-# export FOO="give you up" BAR="let you down" BAZ="run around and desert you"
-# echo -e "Never gonna {{ FOO }}. Never gonna {{ BAR }}\nNever Gonna {{ BAZ }}" | cw
-
-readonly cw_version="0.1.0"
+readonly cw_version='0.1.0'
 
 readonly cw_pattern_left='{{'
 readonly cw_pattern_right='}}'
@@ -63,29 +56,25 @@ CLR_CYAN='\033[36m'
 CLR_RED='\033[0;31m'
 CLR_NONE='\033[0m' # No color
 
-if [[ "${1}" = "-v" ]]; then
-    fl_debug=1
-fi
-
 _log() {
     # Usage: "hello world"
-    printf '%b\n' "${0##*/}: ${1}" 1>&2
+    printf '%b\n' "${0##*/}: $1" 1>&2
 }
 
 _debug() {
     # Usage: _debug "hello world"
     if [[ $fl_debug -eq 1 ]]; then
-        _log "${CLR_CYAN}DEBUG:${CLR_NONE} ${1}"
+        _log "${CLR_CYAN}DEBUG:${CLR_NONE} $1"
     fi
 }
 
 _die() {
     # Usage: _die "goodbye cruel world" 128
-    _log "${CLR_RED}FATAL:${CLR_NONE} ${1}"
+    _log "${CLR_RED}FATAL:${CLR_NONE} $1"
 
     local rc
     # Default to return code: '1' if nothing is specified
-    [[ -z "${2}" ]] && rc=1
+    [[ -z "$2" ]] && rc=1
     exit $rc
 }
 
@@ -116,12 +105,12 @@ _replace_first() {
 
 _escape_html () {
     # Usage: _esacpe_html "hello & goodbye"
-    local string="${1}"
+    local string="$1"
     string=${string//&/&amp;}
     string=${string//</&lt;}
     string=${string//>/&gt;}
     string=${string//'"'/&quot;}
-    printf '%s' "${string}"
+    printf '%s' "$string"
 }
 
 _type() {
@@ -160,7 +149,7 @@ _flush() {
     # Usage: _flush foo bar baz
     # Empty array, and set integers to zero
 
-    local variables=("${@}")
+    local variables=("$@")
     for var in "${variables[@]}"; do
         local type="$(_type $var)"
         case "$type" in
@@ -181,40 +170,40 @@ _strip_brackets() {
     # Usage: _strip_brackets "{{ foo }}"
 
     # We can strip using pure bash by breaking it up into steps. Left then Right.
-    local string_raw="${1}"
+    local string_raw="$1"
     local string=""
 
-    string_raw=$(_strip_left "${string_raw}" "*${cw_pattern_left} ")
-    string=$(_strip_right "${string_raw}" " ${cw_pattern_right}*")
+    string_raw=$(_strip_left "$string_raw" "*$cw_pattern_left ")
+    string=$(_strip_right "$string_raw" " $cw_pattern_right*")
 
-    printf '%s\n' "${string}"
+    printf '%s\n' "$string"
 }
 
 _strip_character_classes() {
     # Usage: _strip_character_classes "Hello[[:crunchwrap_nospace:]]World"
 
-    local array=("${@}")
+    local array=("$@")
     local string=""
     local chunk
 
     for ((j = 0; j < "${#array[@]}"; j++)); do
         chunk="${array[$j]}"
-        case "${chunk}" in
-            "${cc_nospace}")
+        case "$chunk" in
+            "$cc_nospace")
                 string+=''
                 ;;
-            "${cc_tab}")
+            "$cc_tab")
                 string+=$'\t'
                 ;;
-            "${cc_space}")
+            "$cc_space")
                 string+=" "
                 ;;
             *)
-                string+="${chunk}"
+                string+="$chunk"
                 ;;
         esac
     done
-    printf '%s\n' "${string}"
+    printf '%s\n' "$string"
 }
 
 _eval_tags() {
@@ -223,10 +212,10 @@ _eval_tags() {
     # this behavior by using '{{!' instead. This way crunchwrap will
     # return a code > 0
 
-    local string="${*}"
+    local string="$*"
     local cw_variable cw_value
 
-    _debug "func: '${FUNCNAME[0]}' called with argument: '${*}'"
+    _debug "func: '${FUNCNAME[0]}' called with argument: '$*'"
 
     # Replace '{{<d>' with '{{'                             (d for delimiter)
     # -----------------------------------------------------------------------
@@ -249,83 +238,83 @@ _eval_tags() {
     # is set. The actual contents of the variable doesn't matter. See `-v`
     # in man bash.
 
-    if [[ "${string}" =~ $regex_crunchwrap_strict_syntax ]]; then
+    if [[ "$string" =~ $regex_crunchwrap_strict_syntax ]]; then
         fail_when_empty=true
-        _debug "var: fail_when_empty='${fail_when_empty}' for string: '${string}'"
+        _debug "var: fail_when_empty='$fail_when_empty' for string: '$string'"
 
-        string=$(_replace_first "${string}" "${cw_pattern_left_strict} " "{{ ")
-    elif [[ "${string}" =~ $regex_crunchwrap_escaped_syntax ]]; then
+        string=$(_replace_first "$string" "$cw_pattern_left_strict " "{{ ")
+    elif [[ "$string" =~ $regex_crunchwrap_escaped_syntax ]]; then
         escape_html=true
-        _debug "var: escape_html='${escape_html}' for string: '${string}'"
+        _debug "var: escape_html='$escape_html' for string: '$string'"
 
-        string=$(_replace_first "${string}" "${cw_pattern_left_escaped} " "{{ ")
-    elif [[ "${string}" =~ $regex_crunchwrap_import_syntax ]]; then
+        string=$(_replace_first "$string" "$cw_pattern_left_escaped " "{{ ")
+    elif [[ "$string" =~ $regex_crunchwrap_import_syntax ]]; then
         import_template=true
-        _debug "var: import_template='${import_tempate}' for string: '${string}'"
+        _debug "var: import_template='$import_tempate' for string: '$string'"
 
-        string=$(_replace_first "${string}" "${cw_pattern_left_import} " "{{ ")
+        string=$(_replace_first "$string" "$cw_pattern_left_import " "{{ ")
     fi
 
-    cw_variable=$(_strip_brackets "${string}")
+    cw_variable=$(_strip_brackets "$string")
 
-    if [[ -v import_template ]] && [[ -n "${cw_variable}" ]]; then
+    if [[ -v import_template ]] && [[ -n "$cw_variable" ]]; then
         unset import_template
 
-        [[ ! -f "${cw_variable}" ]] && _die "Template: '${cw_variable}' does not exist."
+        [[ ! -f "$cw_variable" ]] && _die "Template: '$cw_variable' does not exist."
 
-        # Alternative way to print file contents. Many would just 'cat' the file
+        # Alternative way to print file contents. Many would use 'cat' here
         cw_value=$(printf '%s\n' "$(<$cw_variable)" | _read)
     else
-        cw_value=$(eval printf '%s' \"\$"${cw_variable}"\")
+        cw_value=$(eval printf '%s' \"\$"$cw_variable"\")
     fi
 
-    if [[ -v fail_when_empty ]] && [[ -z "${cw_value}" ]]; then
+    if [[ -v fail_when_empty ]] && [[ -z "$cw_value" ]]; then
         unset fail_when_empty
 
-        _die "Variable: '${cw_variable}' evaluated to an empty string." 126
-    elif [[ -v escape_html ]] && [[ -n "${cw_value}" ]]; then
+        _die "Variable: '$cw_variable' evaluated to an empty string." 126
+    elif [[ -v escape_html ]] && [[ -n "$cw_value" ]]; then
         unset escape_html
 
-        _debug "Calling func: '_escape_html' with argument: ${cw_value}"
-        cw_value=$(_escape_html "${cw_value}")
+        _debug "Calling func: '_escape_html' with argument: $cw_value"
+        cw_value=$(_escape_html "$cw_value")
 
-        _debug "var: cw_value='${cw_value}'"
+        _debug "var: cw_value='$cw_value'"
     fi
 
-    _debug "var: cw_variable='${cw_variable}'"
-    _debug "var: cw_value='${cw_value}'"
+    _debug "var: cw_variable='$cw_variable'"
+    _debug "var: cw_value='$cw_value'"
 
     # Check for nested crunchwrap tags
-    if [[ "${cw_value}" =~ $regex_crunchwrap_syntax ]]; then
-        _debug "Found nested tags while evaluating: '${cw_variable}'"
-        cw_value=$(printf '%s\n' "${cw_value}" | _read)
+    if [[ "$cw_value" =~ $regex_crunchwrap_syntax ]]; then
+        _debug "Found nested tags while evaluating: '$cw_variable'"
+        cw_value=$(printf '%s\n' "$cw_value" | _read)
         # Don't let the above line intimidate you. All we're doing is re-using
         # exsiting code. We could accomplish the same thing with something like:
 
-        # cw_value_old="${cw_value}"
+        # cw_value_old="$cw_value"
         # cw_value=''
         # while IFS='' read -r line; do
-        #     cw_value+="$(_parse "${line}")"
-        # done <<< "${cw_value_old}"
+        #     cw_value+="$(_parse "$line")"
+        # done <<< "$cw_value_old"
     fi
 
     # Print the string with the resolved tag/variable
-    _replace_all "${string}" "${cw_pattern_left} ${cw_variable} ${cw_pattern_right}" "${cw_value}"
+    _replace_all "$string" "$cw_pattern_left $cw_variable $cw_pattern_right" "$cw_value"
 }
 
 _parse() {
-    local line="${1}"
+    local line="$1"
 
     _debug "func: '${FUNCNAME[0]}' called with argument: '$1'"
 
     # Before we do anything we need to replace all whitespace with specialty
     # character classes that crunchwrap knows to look for
-    line=$(_replace_all "${line}" " " " ${cc_space} ") # spaces
-    line=$(_replace_all "${line}" $'\t' " ${cc_tab} ") # tabs
+    line=$(_replace_all "$line" " " " $cc_space ") # spaces
+    line=$(_replace_all "$line" $'\t' " $cc_tab ") # tabs
 
     # Take the line that was just read in, and split it into an array
     # Why? there could be multiple crunchrap tags in one line
-    IFS=' ' read -r -a line_arr <<< "${line}"
+    IFS=' ' read -r -a line_arr <<< "$line"
 
     declare -a line_fragment_arr line_arr_transformed
     declare -i found_open_tag found_tag_contents found_closed_tag
@@ -347,40 +336,40 @@ _parse() {
             # Check for consecutive crunchwrap variables that aren't delimited by a space:
             # '{{ <string> }}<string>{{ <string> }}'
             #              ^^^^^^^^^^^^
-            _debug "Found conjoined left/right patterns: '${chunk}'. Splitting..."
+            _debug "Found conjoined left/right patterns: '$chunk'. Splitting..."
 
             local sandwiched_characters
-            sandwiched_characters=$(_strip_left "${chunk}" "}}")
-            sandwiched_characters=$(_strip_right "${sandwiched_characters}" "{{")
+            sandwiched_characters=$(_strip_left "$chunk" "}}")
+            sandwiched_characters=$(_strip_right "$sandwiched_characters" "{{")
             # If var: sandwiched_characters is an empty string it won't be
             # included into array: line_arr
 
-            local splice=("}}" "${cc_nospace}" "${sandwiched_characters}" "${cc_nospace}" "{{")
+            local splice=("}}" "$cc_nospace" "$sandwiched_characters" "$cc_nospace" "{{")
             line_arr=("${line_arr[@]:0:$i}" "${splice[@]}" "${line_arr[@]:$((i+1))}")
 
             line_arr_splice_count=$((line_arr_splice_count + 1))
-            _debug "var: line_arr_splice_count='${line_arr_splice_count}'"
+            _debug "var: line_arr_splice_count='$line_arr_splice_count'"
 
             # Since we've dynamically expanded thearray: line_arr we must
             # manually update var: chunk
-            chunk="${cw_pattern_right}"
+            chunk="$cw_pattern_right"
         fi
 
         # Classify chunk. Does it have any special meaning to crunchwrap
         # or does the chunk consist of random characters?
-        case "${chunk}" in
-            *"${cw_pattern_left}"|*"${cw_pattern_left_strict}"|*"${cw_pattern_left_escaped}"|*"${cw_pattern_left_import}")
-                _debug "Found left pattern: '${chunk}'"
+        case "$chunk" in
+            *"$cw_pattern_left"|*"$cw_pattern_left_strict"|*"$cw_pattern_left_escaped"|*"$cw_pattern_left_import")
+                _debug "Found left pattern: '$chunk'"
                 # We found the left: '{{ <string> }}'
                 #                     ^^
-                line_fragment_arr+=("${chunk}")
+                line_fragment_arr+=("$chunk")
                 found_open_tag=1
                 ;;
             "${cw_pattern_right}"*)
-                _debug "Found right pattern: '${chunk}'"
+                _debug "Found right pattern: '$chunk'"
                 # We found the right: '{{ <string> }}'
                 #                                  ^^
-                line_fragment_arr+=("${chunk}")
+                line_fragment_arr+=("$chunk")
                 found_closed_tag=1
 
                 # Check for mismatched/lone brackets
@@ -396,7 +385,7 @@ _parse() {
                     results=$(_eval_tags "${line_fragment_arr[*]}")
                     [[ $? -eq 0 ]] || return
 
-                    line_arr_transformed+=("${results}")
+                    line_arr_transformed+=("$results")
 
                     # Reset. Just in case their are more crunchwrap tags in
                     # the remainder of array: line_arr
@@ -406,14 +395,14 @@ _parse() {
             *)
                 if [[ $found_open_tag -eq 0 ]] && [[ $found_closed_tag -eq 0 ]]; then
                     # We haven't found '{{' or '}}' so let's keep on going
-                    line_arr_transformed+=("${chunk}")
-                elif [[ "${chunk}" =~ $regex_character_class ]]; then
-                    _debug "Ignoring crunchwrap character class: '${chunk}'"
+                    line_arr_transformed+=("$chunk")
+                elif [[ "$chunk" =~ $regex_character_class ]]; then
+                    _debug "Ignoring crunchwrap character class: '$chunk'"
                 elif [[ $found_open_tag -eq 1 && $found_closed_tag -eq 0 ]]; then
-                    _debug "Found middle: '${chunk}'"
+                    _debug "Found middle: '$chunk'"
                     # We found the middle: '{{ <string> }}'
                     #                          ^^^^^^^^
-                    line_fragment_arr+=("${chunk}")
+                    line_fragment_arr+=("$chunk")
                     found_tag_contents=1
                 fi
                 ;;
@@ -435,7 +424,7 @@ _parse() {
 }
 
 _source() {
-    local files=("${@}")
+    local files=("$@")
     local prefix=""
     local cmd
 
@@ -444,8 +433,8 @@ _source() {
     fi
 
     for f in "${files[@]}"; do
-        if [[ ! -f "${f}" ]]; then
-            _die "File: '${f}' does not exist."
+        if [[ ! -f "$f" ]]; then
+            _die "File: '$f' does not exist."
         fi
 
         source $f
@@ -454,20 +443,20 @@ _source() {
 
 _read() {
     # By default 'read' trims leading/trailing whitespace. so we must use override IFS
-    while IFS='' read -r line || [[ -n "${line}" ]]; do
-        # || [[ -n "${line}" ]]
+    while IFS='' read -r line || [[ -n "$line" ]]; do
+        # || [[ -n "$line" ]]
         # Without this 'or' conditional single line inputs that don't end with
         # a newline won't be picked up
 
-        if [[ ! "${line}" =~ $regex_crunchwrap_syntax ]]; then
+        if [[ ! "$line" =~ $regex_crunchwrap_syntax ]]; then
             # Pass the unaltered string through if it doesn't contain: {{ <string> }}
-            _debug "Line: '${line}' doesn't match regex. Passing it through unmodified."
-            printf '%s\n' "${line}"
+            _debug "Line: '$line' doesn't match regex. Passing it through unmodified."
+            printf '%s\n' "$line"
             continue
         fi
 
         # The 'break' is kinda redundant since errexit is enabled
-        _parse "${line}" || break
+        _parse "$line" || break
     done
 }
 
@@ -524,4 +513,4 @@ main() {
 }
 
 # Passthrough cli arguments to func: main
-main "${@}"
+main "$@"
