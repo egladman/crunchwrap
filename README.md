@@ -1,84 +1,48 @@
 # crunchwrap
-Barebones mustache-like templating written in pure Bash. Crunchwrap works by evalulating existing variables in your shell's environment. Use anywhere you'd use pipes!
+Barebones logic-less templating written in pure Bash inspired by [mustache](https://mustache.github.io/). Crunchwrap works by evaluating variables in your shell.
 
-### Dependencies
+```
+printf '%s\n' "Hello {{ USER }}!" | cw
+```
+
+### Install
+
+```
+git clone https://github.com/egladman/crunchwrap.git
+cp crunchwrap/crunchwrap /usr/local/bin/cw
+```
+
+#### Dependencies
 
 - **Bash 4.0+** Unlike similar projects, crunchwrap doesn't depend on GNU Coreutils, instead crunchwrap leverages Bash's builtins commands.
 
 
-### Syntax
+### Variables
 
 ```
 {{ <var> }}
+{{! <var> }}                   # Exit if variable evaluates to an empty string
+{{% <var> }}                   # Escape HTML
 ```
 
 ---
 
-Exit if `<var>` evaluates to an empty string
+### Templates
+
+A template is a file that contains any number of crunchwrap tags. The template's filename typically ends with `.cw`, however this is not a requirement.
+
+
+#### Importing Templates
 
 ```
-{{! <var> }}
+{{@ <path/to/template> }}
 ```
 
----
-
-Escape html
-
-```
-{{% <var> }}
-```
-*Note:* This is super useful if you use crunchwrap as a static site generator. See [egladman/egladman.github.io](https://github.com/egladman/egladman.github.io) for an example.
+*Note:* At this time the template's path specified in the tag cannot contain any spaces.
 
 ### Examples
 
-```
-export bar="give you up" qux="run around and desert you" baz="let you down" foo="Never gonna"
-echo -e "{{ foo }} {{ bar }}\n{{ foo }} {{ baz }}\n{{ foo }} {{ qux }}" | cw 
-```
-
-#### Results
-
-```
-Never gonna give you up
-Never gonna let you down
-Never gonna run around and desert you
-```
-
---- 
-
-```
-cat << EOF > /tmp/sample.html.cw
-
-<!DOCTYPE html>
-<html>
-<body>
-
-<h1>{{ foo }}</h1>
-
-</body>
-</html>
-EOF
-```
-
-```
-export foo="Hello World"; cat /tmp/sample.html.cw | cw > /tmp/sample.html
-```
-
-#### Results
-
-```
-<!DOCTYPE html>
-<html>
-<body>
-
-<h1>Hello World</h1>
-
-</body>
-</html>
-```
-
----
-
+Template:
 ```
 cat << EOF > /tmp/helloWorld.txt.cw
 
@@ -100,12 +64,12 @@ HELLO {{ e }} WORLD
 EOF
 ```
 
+Command:
 ```
-export a="Hello" b="H E L L O" c="world" d="hello" e=" & " f="\"HeLLo\" & GoODbyE" g="{{ d }}{{ c }}"; cat /tmp/helloWorld.txt.cw | cw > /tmp/helloWorld.txt
+export a="Hello" b="H E L L O" c="world" d="hello" e=" & " f="\"HeLLo\" & GoODbyE" g="{{ c }}{{ d }}"; cat /tmp/helloWorld.txt.cw | cw
 ```
 
-#### Results
-
+Output:
 ```
 
 HelloWorld
@@ -119,18 +83,10 @@ hello_world
 HELLO & WORLD
 HELLO  &  WORLD
 hello\tworld
-helloworld
+worldhello
 
 &quot;HeLLo&quot; &amp; GoODbyE
 
-
-```
-
-### Install
-
-```
-git clone https://github.com/egladman/crunchwrap.git
-cp crunchwrap/crunchwrap /usr/local/bin/cw
 ```
 
 # Acknowledgements
