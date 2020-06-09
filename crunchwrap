@@ -26,7 +26,7 @@
 # Install
 # cp crunchwrap /usr/local/bin/cw && chmod +x /usr/local/bin/cw
 
-readonly cw_version='0.1.0'
+readonly cw_version='0.2.0'
 
 readonly cw_pattern_left='{{'
 readonly cw_pattern_right='}}'
