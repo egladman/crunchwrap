@@ -12,10 +12,26 @@ git clone https://github.com/egladman/crunchwrap.git
 cp crunchwrap/crunchwrap /usr/local/bin/cw
 ```
 
+```
+$ cw --help
+crunchwrap v0.1.0, a logic-less templating engine.
+Usage: cw [options...] <path/to/variables>
+Options:
+  -h, --help                                 show this help text
+  -v, --verbose                              make the operation more talkative
+  -i, --ignore-emvironment                   start with an empty environment
+  -V. --version                              print crunchwrap version
+
+Report issues at https://github.com/egladman/crunchwrap/issues
+```
+
 #### Dependencies
 
-- **Bash 4.0+** Unlike similar projects, crunchwrap doesn't depend on GNU Coreutils, instead crunchwrap leverages Bash's builtins commands.
+- **Bash 4.0+** Unlike similar projects, crunchwrap doesn't depend on GNU Coreutils by default. Everything is handled by Bash's builtins commands.
 
+##### Disclaimer
+
+Optional flag`-i, --ignore-environment` depends on `env`, an external program provided by Coreutils. I could've looped through each variable and leveraged builtin `unset` to empty the environment. However this solution isn't as elegant as `env -i`. Given how ubiquitous `env` is, I don't think it's inclusion will negatively impact anyone.
 
 ### Variables
 
@@ -42,7 +58,7 @@ A template is a file that contains any number of crunchwrap tags. The template's
 
 ### Examples
 
-Template:
+Create Template:
 ```
 cat << EOF > /tmp/helloWorld.txt.cw
 
@@ -88,6 +104,11 @@ worldhello
 &quot;HeLLo&quot; &amp; GoODbyE
 
 ```
+
+# License
+
+MIT
+
 
 # Acknowledgements
 
