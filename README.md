@@ -27,7 +27,7 @@ Report issues at https://github.com/egladman/crunchwrap/issues
 
 #### Dependencies
 
-- **Bash 4.0+** Unlike similar projects, crunchwrap doesn't depend on GNU Coreutils by default. Everything is handled by Bash's builtins commands.
+- **Bash 4.0+** Unlike similar projects, crunchwrap doesn't depend on GNU Coreutils by default. Everything is handled by Bash's builtins.
 
 ##### Disclaimer
 
