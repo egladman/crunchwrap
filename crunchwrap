@@ -522,7 +522,9 @@ main() {
         args=($(_replace_first "${args[*]}" "$blacklisted_option" ""))
 
         _debug "Executing: $0 without option 'ignore environment'" # for we don't break the space time continuum
-        exec /usr/bin/env --ignore-environment PATH="$PATH" "$0" "${args[@]}"
+
+        # OpenBSD's env doesn't support '--ignore-environment' so we must use `-i` for compatability
+        exec /usr/bin/env -i PATH="$PATH" "$0" "${args[@]}"
     fi
 
     # Sideload environment variables if paths were specified
