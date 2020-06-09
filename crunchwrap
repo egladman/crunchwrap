@@ -93,6 +93,13 @@ _strip_all() {
     printf '%s\n' "${1//$2}"
 }
 
+_trim() {
+    # Usage: _trim "   example   string    "
+    : "${1#"${1%%[![:space:]]*}"}"
+    : "${_%"${_##*[![:space:]]}"}"
+    printf '%s\n' "$_"
+}
+
 _replace_all() {
     # Usage: _replace_all "string" "pattern" "replace"
     printf '%s\n' "${1//$2/$3}"
@@ -265,6 +272,7 @@ _eval_tags() {
         # Alternative way to print file contents. Many would use 'cat' here
         cw_value=$(printf '%s\n' "$(<$cw_variable)" | _read)
     else
+        _debug "Current Environment:\n$(env)"
         cw_value=$(eval printf '%s' \"\$"$cw_variable"\")
     fi
 
@@ -428,16 +436,16 @@ _source() {
     local prefix=""
     local cmd
 
-    if [[ $fl_ignore_environment -eq 1 ]]; then
-        _die "Option '--ignore-environment' not supported yet."
-    fi
+    # if [[ $fl_ignore_environment -eq 1 ]]; then
+    #     _die "Option '--ignore-environment' not supported yet."
+    # fi
 
     for f in "${files[@]}"; do
         if [[ ! -f "$f" ]]; then
             _die "File: '$f' does not exist."
         fi
 
-        source $f
+        source "$f"
     done
 }
 
@@ -466,13 +474,15 @@ Options:
   -h, --help                                 show this help text
   -v, --verbose                              make the operation more talkative
   -i, --ignore-emvironment                   start with an empty environment
+  -V. --version                              print crunchwrap version
 
 Report issues at https://github.com/egladman/crunchwrap/issues
 "
 
 main() {
     # Array of files that will 'sourced' before rendering template
-    source_files_arr=()
+    local source_files_arr=()
+    local blacklisted_option
 
     while [[ "$#" -gt 0 ]]; do
         case "$1" in
@@ -489,21 +499,30 @@ main() {
                 ;;
             -i|--ignore-environment)
                 fl_ignore_environment=1
+
+                # Further down we need to know whether '-i' or
+                # '--ignore-environment' was passed in.
+                blacklisted_option="$1"
                 ;;
             # -e|--example)
             #     example_var="$2";
             #     shift
             #     ;;
             *)
+                _debug "Appending '$1' to array: 'source_files_arr'"
                 source_files_arr+=("$1")
         esac
         shift
     done
 
-    # Check to make sure we have at least one element in array: 'source_arr'
     if [[ -z "${source_files_arr[0]}" ]] && [[ $fl_ignore_environment -eq 1 ]]; then
         _die "Option 'ignore environment' requires file path(s). None given."
+    elif [[ $fl_ignore_environment -eq 1 ]]; then # Rerun crunchwrap in an empty environment
+        # Replace $blacklisted_option with empty string
+        args=($(_replace_first "${args[*]}" "$blacklisted_option" ""))
 
+        _debug "Executing: $0 without option 'ignore environment'" # for we don't break the space time continuum
+        exec /usr/bin/env --ignore-environment PATH="$PATH" "$0" "${args[@]}"
     fi
 
     # Sideload environment variables if paths were specified
@@ -512,5 +531,6 @@ main() {
     _read
 }
 
-# Passthrough cli arguments to func: main
-main "$@"
+# Pass cli arguments to func: main
+args=("$@")
+main "${args[@]}"
