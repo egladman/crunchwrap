@@ -40,6 +40,7 @@ readonly regex_character_class='^(\[\[\:)(crunchwrap_[a-zA-Z0-9_]{1,})(\:\]\])$'
 readonly regex_crunchwrap_strict_syntax='^(.*)(\{\{\![[:space:]][a-zA-Z0-9_]{1,}[[:space:]]\}\})(.*)$'
 readonly regex_crunchwrap_escaped_syntax='^(.*)(\{\{\%[[:space:]][a-zA-Z0-9_]{1,}[[:space:]]\}\})(.*)$'
 readonly regex_crunchwrap_import_syntax='^(.*)(\{\{\@[[:space:]][a-zA-Z0-9_/.-]{1,}[[:space:]]\}\})(.*)$'
+readonly regex_valid_base64='^([a-zA-Z0-9\/+]{4})(\S{0,})([a-zA-Z0-9\/+]{2})(={0,2})$'
 
 # Non-standard Character Classes
 readonly cc_nospace='[[:crunchwrap_nospace:]]'
@@ -276,6 +277,10 @@ _eval_tags() {
         cw_value=$(eval printf '%s' \"\$"$cw_variable"\")
     fi
 
+    if [[ "$cw_value" =~ $regex_valid_base64 ]]; then
+        cw_value=$(eval printf '%s\n' "$cw_value" | base64 -d)
+    fi
+
     if [[ -v fail_when_empty ]] && [[ -z "$cw_value" ]]; then
         unset fail_when_empty
 
@@ -441,7 +446,7 @@ _source() {
     # fi
 
     for f in "${files[@]}"; do
-        if [[ ! -f "$f" ]]; then
+        if [[ ! -f "$f" ]] && [[ ! -p "$f" ]]; then
             _die "File: '$f' does not exist."
         fi
 
@@ -504,10 +509,6 @@ main() {
                 # '--ignore-environment' was passed in.
                 blacklisted_option="$1"
                 ;;
-            # -e|--example)
-            #     example_var="$2";
-            #     shift
-            #     ;;
             *)
                 _debug "Appending '$1' to array: 'source_files_arr'"
                 source_files_arr+=("$1")
