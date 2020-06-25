@@ -40,7 +40,8 @@ readonly regex_character_class='^(\[\[\:)(crunchwrap_[a-zA-Z0-9_]{1,})(\:\]\])$'
 readonly regex_crunchwrap_strict_syntax='^(.*)(\{\{\![[:space:]][a-zA-Z0-9_]{1,}[[:space:]]\}\})(.*)$'
 readonly regex_crunchwrap_escaped_syntax='^(.*)(\{\{\%[[:space:]][a-zA-Z0-9_]{1,}[[:space:]]\}\})(.*)$'
 readonly regex_crunchwrap_import_syntax='^(.*)(\{\{\@[[:space:]][a-zA-Z0-9_/.-]{1,}[[:space:]]\}\})(.*)$'
-readonly regex_valid_base64='^([a-zA-Z0-9\/+]{4})(\S{0,})([a-zA-Z0-9\/+]{2})(={0,2})$'
+readonly regex_valid_base64='^([A-Za-z0-9+\/]{4})*([A-Za-z0-9+\/]{3}=|[A-Za-z0-9+\/]{2}==|[A-Za-z0-9+\/]{4})$'
+# ^([A-Za-z0-9+\/]{4})*([A-Za-z0-9+\/]{3}=|[A-Za-z0-9+\/]{2}==)?$
 
 # Non-standard Character Classes
 readonly cc_nospace='[[:crunchwrap_nospace:]]'
@@ -52,6 +53,7 @@ readonly cc_tab='[[:crunchwrap_tab:]]'
 # Defaults. These can be overridden from cli
 fl_ignore_environment=0
 fl_debug=0
+fl_decode_base64=0
 
 CLR_CYAN='\033[36m'
 CLR_RED='\033[0;31m'
@@ -271,14 +273,29 @@ _eval_tags() {
         [[ ! -f "$cw_variable" ]] && _die "Template: '$cw_variable' does not exist."
 
         # Alternative way to print file contents. Many would use 'cat' here
-        cw_value=$(printf '%s\n' "$(<$cw_variable)" | _read)
+        cw_value="$(printf '%s\n' "$(<$cw_variable)" | _read)"
     else
         _debug "Current Environment:\n$(env)"
-        cw_value=$(eval printf '%s' \"\$"$cw_variable"\")
+        cw_value="$(eval printf '%s' \"\$"$cw_variable"\")"
     fi
 
-    if [[ "$cw_value" =~ $regex_valid_base64 ]]; then
-        cw_value=$(eval printf '%s\n' "$cw_value" | base64 -d)
+    # Decode base64 tags
+    # This is super helpful when dealing with complex multi-line strings
+    if [[ $fl_decode_base64 -eq 1 ]] && [[ "$cw_value" =~ $regex_valid_base64 ]]; then # it's probably base64
+	      local results
+	      results="$(printf '%s\n' "$cw_value" | base64 -d)"
+	      # Account for edge-case where "cw_value" character length is divisable
+        # by 4, but "cw_value" is not base64 encoded. This check is by no means
+        # bulletproof. We only check the first 4 characters to speed up
+        # performance. Bash regex is slow enogh as it is. The less characters
+        # we compare the faster we move on...
+
+        # This will probably bite future me in the ass
+
+        # We trim leading whitespace, otherwise we won't match all valid results. Some values start with a newline.
+        if [[ "${results##[[:space:]]}}" =~ ^([[:print:]]{4}) ]]; then
+            cw_value="$(printf '%s\n' "$cw_value" | base64 -d)"
+        fi
     fi
 
     if [[ -v fail_when_empty ]] && [[ -z "$cw_value" ]]; then
@@ -478,6 +495,7 @@ Usage: ${0##*/} [options...] <path/to/variables>
 Options:
   -h, --help                                 show this help text
   -v, --verbose                              make the operation more talkative
+  -d, --decode-base64                        decode base64 tags
   -i, --ignore-emvironment                   start with an empty environment
   -V. --version                              print crunchwrap version
 
@@ -501,6 +519,9 @@ main() {
             -V|--version)
                 printf '%s\n' "$cw_version"
                 exit 0
+                ;;
+            -d|--decode-base64)
+                fl_decode_base64=1
                 ;;
             -i|--ignore-environment)
                 fl_ignore_environment=1
